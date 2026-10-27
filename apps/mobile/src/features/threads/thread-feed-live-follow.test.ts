@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vite-plus/test";
 
 import {
+  resolveThreadFeedEndFollowState,
   resolveThreadFeedLiveFollow,
   resolveThreadFeedReflowAnchor,
   resolveThreadFeedReflowOffset,
@@ -8,6 +9,8 @@ import {
   resolveThreadFeedSubmissionAnchor,
   resolveThreadWorkGroupInitialScroll,
   shouldFollowThreadWorkGroupAppend,
+  threadFeedShowsScrollToEnd,
+  type ThreadFeedLiveFollowEvent,
 } from "./thread-feed-live-follow";
 
 describe("tool-group scroll restoration", () => {
@@ -196,6 +199,52 @@ describe("resolveThreadFeedLiveFollow", () => {
         userScrollSessionActive: true,
       }),
     ).toBe(false);
+  });
+});
+
+describe("scroll-to-end visibility", () => {
+  const replay = (events: ReadonlyArray<ThreadFeedLiveFollowEvent>) =>
+    events.reduce(resolveThreadFeedEndFollowState, { following: true, atEnd: true });
+  const scroll = (isAtEnd: boolean, userScrollSessionActive = true) =>
+    ({ type: "scroll", isAtEnd, userScrollSessionActive }) as const;
+  const release = (isAtEnd: boolean) =>
+    ({ type: "user-scroll-end", isAtEnd, userScrollSessionActive: true }) as const;
+
+  it("stays hidden when a drag starts at the end", () => {
+    const state = replay([{ type: "user-scroll-begin" }]);
+    expect(state.following).toBe(false);
+    expect(threadFeedShowsScrollToEnd(state)).toBe(false);
+  });
+
+  it("stays hidden while overscrolling past the end, and follows again on release", () => {
+    const dragging = replay([{ type: "user-scroll-begin" }, scroll(true), scroll(true)]);
+    expect(threadFeedShowsScrollToEnd(dragging)).toBe(false);
+    const released = resolveThreadFeedEndFollowState(dragging, release(true));
+    expect(released).toEqual({ following: true, atEnd: true });
+    expect(threadFeedShowsScrollToEnd(released)).toBe(false);
+  });
+
+  it("shows once the reader actually leaves the end and keeps following paused", () => {
+    const state = replay([{ type: "user-scroll-begin" }, scroll(false), release(false)]);
+    expect(state.following).toBe(false);
+    expect(threadFeedShowsScrollToEnd(state)).toBe(true);
+  });
+
+  it("hides when the reader drags back to the end", () => {
+    const away = replay([{ type: "user-scroll-begin" }, scroll(false), release(false)]);
+    const back = [{ type: "user-scroll-begin" } as const, scroll(true)].reduce(
+      resolveThreadFeedEndFollowState,
+      away,
+    );
+    expect(threadFeedShowsScrollToEnd(back)).toBe(false);
+    expect(resolveThreadFeedEndFollowState(back, release(true)).following).toBe(true);
+  });
+
+  it("hides when the button scrolls the feed to the end", () => {
+    const away = replay([{ type: "user-scroll-begin" }, scroll(false), release(false)]);
+    const landed = resolveThreadFeedEndFollowState(away, scroll(true, false));
+    expect(landed).toEqual({ following: true, atEnd: true });
+    expect(threadFeedShowsScrollToEnd(landed)).toBe(false);
   });
 });
 

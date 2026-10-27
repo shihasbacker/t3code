@@ -199,10 +199,11 @@ import {
 } from "../../lib/threadActivity";
 import type { ThreadContentPresentation } from "./threadContentPresentation";
 import {
-  resolveThreadFeedLiveFollow,
+  resolveThreadFeedEndFollowState,
   resolveThreadFeedReflowAnchor,
   resolveThreadFeedReflowOffset,
   resolveThreadFeedReflowScroll,
+  threadFeedShowsScrollToEnd,
   type ThreadFeedLiveFollowEvent,
   type ThreadFeedReflowAnchor,
   type ThreadWorkGroupScrollPosition,
@@ -361,6 +362,7 @@ export interface ThreadFeedProps {
   readonly usesAutomaticContentInsets?: boolean;
   readonly onHeaderMaterialVisibilityChange?: (visible: boolean) => void;
   readonly onEndFollowEnabledChange?: (enabled: boolean) => void;
+  readonly onScrollToEndVisibleChange?: (visible: boolean) => void;
   readonly skills?: ReadonlyArray<SelectableMarkdownSkill>;
   readonly onUseArtifactTemplate?: (template: CodexArtifactTemplate) => void;
 }
@@ -2100,7 +2102,12 @@ export const ThreadFeed = memo(function ThreadFeed({
   ref,
   ...props
 }: ThreadFeedProps & { readonly ref?: Ref<ThreadFeedHandle> }) {
-  const { listRef, onEndFollowEnabledChange, onHeaderMaterialVisibilityChange } = props;
+  const {
+    listRef,
+    onEndFollowEnabledChange,
+    onHeaderMaterialVisibilityChange,
+    onScrollToEndVisibleChange,
+  } = props;
   const workflowOpening = useWorkflowOpening(props.detailRef);
   const guestShare = useThreadGuestShare(props.detailRef);
   const deviceType = useDeviceType();
@@ -2147,7 +2154,18 @@ export const ThreadFeed = memo(function ThreadFeed({
   const endFollowEnabledRef = useRef(true);
   // Only user scrolls from drag through momentum break follow; ignore MVCP and programmatic adjustments.
   const userScrollSessionRef = useRef(false);
-  const setEndFollow = (enabled: boolean) => {
+  const atEndRef = useRef(true);
+  const scrollToEndVisibleRef = useRef(false);
+  const setEndFollow = (enabled: boolean, atEnd?: boolean) => {
+    if (atEnd !== undefined) atEndRef.current = atEnd;
+    const scrollToEndVisible = threadFeedShowsScrollToEnd({
+      following: enabled,
+      atEnd: atEndRef.current,
+    });
+    if (scrollToEndVisibleRef.current !== scrollToEndVisible) {
+      scrollToEndVisibleRef.current = scrollToEndVisible;
+      onScrollToEndVisibleChange?.(scrollToEndVisible);
+    }
     if (endFollowEnabledRef.current === enabled) {
       return;
     }
@@ -2156,7 +2174,11 @@ export const ThreadFeed = memo(function ThreadFeed({
     onEndFollowEnabledChange?.(enabled);
   };
   const transitionEndFollow = (event: ThreadFeedLiveFollowEvent) => {
-    setEndFollow(resolveThreadFeedLiveFollow(endFollowEnabledRef.current, event));
+    const next = resolveThreadFeedEndFollowState(
+      { following: endFollowEnabledRef.current, atEnd: atEndRef.current },
+      event,
+    );
+    setEndFollow(next.following, next.atEnd);
   };
   // Capture the reader's anchor before width reflow; LegendList thresholds see only new geometry.
   // iOS preserves it during re-measures. Android restores after because following disables MVCP.

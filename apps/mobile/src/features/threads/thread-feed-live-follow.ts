@@ -92,6 +92,27 @@ export function resolveThreadFeedLiveFollow(
   }
 }
 
+export interface ThreadFeedEndFollowState {
+  readonly following: boolean;
+  readonly atEnd: boolean;
+}
+
+export function resolveThreadFeedEndFollowState(
+  current: ThreadFeedEndFollowState,
+  event: ThreadFeedLiveFollowEvent,
+): ThreadFeedEndFollowState {
+  return {
+    following: resolveThreadFeedLiveFollow(current.following, event),
+    // A drag pauses following before it moves, so the end is still under the reader.
+    atEnd: event.type === "reset" ? true : "isAtEnd" in event ? event.isAtEnd : current.atEnd,
+  };
+}
+
+/** Follow pauses on touch-down; the button waits until the reader has actually left the end. */
+export function threadFeedShowsScrollToEnd(state: ThreadFeedEndFollowState) {
+  return !state.following && !state.atEnd;
+}
+
 /** The LegendList state a width reflow reads before rows re-measure and after they settle. */
 export interface ThreadFeedReflowListState {
   readonly data: ReadonlyArray<{ readonly id: string }>;

@@ -481,7 +481,7 @@ function ThreadDetailBody(props: ThreadDetailScreenProps) {
   }, []);
   const [anchorMessageId, setAnchorMessageId] = useState<MessageId | null>(null);
   const feedRef = useRef<ThreadFeedHandle>(null);
-  const [endFollowEnabled, setEndFollowEnabled] = useState(true);
+  const [scrollToEndVisible, setScrollToEndVisible] = useState(false);
   // Keep the bottom padding fixed while the keyboard animates. Changing it at
   // keyboardDidHide makes the composer land low, then jump back above the safe area.
   const bottomBarInset = useDuoBottomBarInset();
@@ -1004,7 +1004,6 @@ function ThreadDetailBody(props: ThreadDetailScreenProps) {
   );
   const handleEndFollowEnabledChange = (enabled: boolean) => {
     endFollowEnabledRef.current = enabled;
-    setEndFollowEnabled(enabled);
   };
   // A jump this thread never reached lets go when it closes.
   useEffect(() => {
@@ -1219,7 +1218,7 @@ function ThreadDetailBody(props: ThreadDetailScreenProps) {
   };
 
   const showScrollToEndButton =
-    !props.draftMode && contentPresentationKind === "ready" && !endFollowEnabled;
+    !props.draftMode && contentPresentationKind === "ready" && scrollToEndVisible;
   const { themeAppearance } = useAppearancePreferences();
   const isDarkMode = themeAppearance === "dark";
 
@@ -1335,6 +1334,7 @@ function ThreadDetailBody(props: ThreadDetailScreenProps) {
               usesAutomaticContentInsets={props.usesAutomaticContentInsets}
               onHeaderMaterialVisibilityChange={props.onHeaderMaterialVisibilityChange}
               onEndFollowEnabledChange={handleEndFollowEnabledChange}
+              onScrollToEndVisibleChange={setScrollToEndVisible}
               skills={selectedProviderSkills}
               onUseArtifactTemplate={handleUseArtifactTemplate}
             />
